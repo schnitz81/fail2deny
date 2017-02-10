@@ -2,7 +2,7 @@
 
 file1='/var/log/auth.log'
 
-# *** In case of more log files, uncomment and write path:
+# ***** In case of more log files, uncomment and write path:
 #file2='...'
 #file3='...'
 #file4='...'
@@ -11,11 +11,11 @@ file1='/var/log/auth.log'
 
 denyfile='/etc/hosts.deny'
 
-failstrings='-e Failed -e failure -e FAIL -e Invalid'  # *** Search words.
+failstrings='-e Failed -e failure -e FAIL -e Invalid'  # ***** Search words.
 
-
-# loop **********************************************************************************
-for logfile in $file1; do  # <---- *** In case of more log files, variables, add here.
+# loop
+for logfile in $file1; do  # <---- ***** In case of more log files added, also add in for statement.
+			   # e.g.:  for logfile in $file1 $file2 $file3 $file4; do
 
 # Find last IP with failed login.
 echo
