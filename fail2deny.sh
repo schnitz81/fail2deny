@@ -2,7 +2,7 @@
 
 file1='/var/log/auth.log'
 
-# *********************************** In case of more log files, change the "/dev/null" dummies to 
+# *********************************** In case of more log files, change the "/dev/null" dummies to file paths. 
 file2='/dev/null'
 file3='/dev/null'
 file4='/dev/null'
@@ -33,7 +33,7 @@ do
 		echo "Checking $logfile..." 
 		ipToCheck=`cat $logfile | grep -i $failstrings | grep -o '[0-9]\+[.][0-9]\+[.][0-9]\+[.][0-9]\+' | tail -n 1`
 	
-		if [[ !  -z  $ipToCheck ]]; then  # if not empty string
+		if [[ ! -z  $ipToCheck ]]; then  # if not empty string
 			echo
 			echo "IP number $ipToCheck has made one or more failed access attempts."
 			echo
