@@ -1,10 +1,12 @@
 # fail2deny
 An alternative to fail2ban that only uses one script file instead of modules and bans in the tcp wrapper instead of iptables.
 
+## Requirements
+This script utilizes the inotify functionality. The inotify-tools tools package needs to be installed.
+
 ## Usage
 - When needed, add more log files at the top of the script (see in-code comments).
-- Call the script every minute as a cronjob,
-  e.g.: * * * * * chrt -i 0 ionice -c 3 nice -n 19 /path/to/fail2deny.sh
+- Run the script either as a background process or in an ordinary terminal instance.
 
 ## License
 
