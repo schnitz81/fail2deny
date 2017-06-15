@@ -19,6 +19,7 @@ echo "Starting to monitoring files..."
 # loop
 inotifywait -m -e modify -q $file1 $file2 $file3 $file4 $file5 | while read file
 do
+	echo "--------------------"
 	echo -n "$(date +"%Y%m%d %H:%M:%S")  "  # Put timestamp
 	echo "Change in logfile detected. Analyzing log files..."
 	
@@ -30,7 +31,6 @@ do
 		fi
 
 		# Find last IP with failed login.
-		echo
 		echo "Checking $logfile..." 
 		ipToCheck=`cat $logfile | grep $failstrings | grep $allowstrings | grep -o '[0-9]\+[.][0-9]\+[.][0-9]\+[.][0-9]\+' | tail -n 1`
 	
@@ -88,6 +88,6 @@ do
 		else
 			echo "More than five minutes between fail logins. Not banning."
 		fi
-		echo "-------------------"
+		echo "--------------------"
 	done 
 done
