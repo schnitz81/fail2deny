@@ -12,7 +12,7 @@ file5='/dev/null'
 denyfile='/etc/hosts.deny'
 
 failstrings='-i -e fail -e Invalid'  # ******************** Search words (case insensitive). The strings in log that are considered fail attempts. 
-allowstrings='-v -i -e check'  # ************************** Exceptions strings that will override the search words.
+allowstrings='-v -i -e check -e pam_unix'  # ************************** Exceptions strings that will override the search words.
 
 echo -n "$(date +"%Y%m%d %H:%M:%S")  "  # Put timestamp
 echo "Starting to monitoring files..."
