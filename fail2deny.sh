@@ -42,8 +42,7 @@ do
 			echo `grep $ipToCheck $logfile | grep $failstrings | grep $allowstrings | wc -l`   # Print no of occurances
 			echo
 			if [ `grep $ipToCheck $logfile | grep $failstrings | grep $allowstrings | wc -l` -gt 4 ]; then  # Check if no of occurances > 4
-				earlyTime=`cat $logfile | grep -e $ipToCheck $failstrings | grep $allowstrings | tail -n 5 | grep -o '.\{0,2\}\:.\{0,2\}' | head -n 1`  # Get fifth last time
-				lateTime=`cat $logfile | grep -e $ipToCheck $failstrings | grep $allowstrings | tail -n 1 | grep -o '.\{0,2\}\:.\{0,2\}' | head -n 1`  # Get last time
+				fiveTimeStampsAgo=`cat $logfile | grep -e $ipToCheck $failstrings | grep $allowstrings | tail -n 5 | grep -o '[0-9]\{2\}\:[0-9]\{2\}' | head -n 1`  # Get fifth last time
 			else
 				echo "Less than five occurances. Will not ban."; echo "-------------------"; continue  # Break loop iteration.
 			fi
@@ -51,33 +50,17 @@ do
 			echo "No IP found to analyze."; echo "-------------------"; continue  # Break loop iteration.
 		fi  
 		
-		# Get minutes
-		earlyMinTime=`date --date="$earlyTime" +%M`
-		lateMinTime=`date --date="$lateTime" +%M`
-		earlyHourTime=`date --date="$earlyTime" +%H`
-		lateHourTime=`date --date="$lateTime" +%H`
-		
-		hDiff=$((10#$lateHourTime-10#$earlyHourTime))
-		
-		# Adjust for minute overflow.
-		if [ $lateMinTime -lt 5 ] && [ $earlyMinTime -gt 54 ] && [ $hDiff -lt 2 ]; then
-		        lateMinTime=$((lateMinTime+5))
-		        earlyMinTime=$((earlyMinTime+5-60))
-			hDiff=0
-		fi
-		mDiff=$((10#$lateMinTime-10#$earlyMinTime))
-		
-		echo Early minute: $earlyMinTime
-		echo Last minute:  $lateMinTime
-		echo Early hour:   $earlyHourTime
-		echo Last hour:    $lateHourTime
-		echo Minute diff:  $mDiff
-		echo Hour diff:    $hDiff
-		echo
-		
+		NOW=$(date +"%T")
+		_5MINSAGO=$(date --date="-5 minutes" +"%T")
+
+		echo now:                  $NOW
+		echo five mins ago:        $_5MINSAGO
+		echo five time stamps ago: $fiveTimeStampsAgo
+		echo 
+
 		# Check timespan and ban if less than 5 minutes. 
-		if [ $hDiff -lt 1 ] && [ $mDiff -lt 6 ]; then
-			echo "Less than five minutes between fail logins. Will ban."
+		if [[ $fiveTimeStampsAgo > $_5MINSAGO ]]; then
+			echo "Less than five minutes between the 5 latest fail logins. Will ban."
 			echo "Checking for IP in deny file..." 
 			if ! grep -q $ipToCheck $denyfile ; then
 				echo "Banning IP..."
