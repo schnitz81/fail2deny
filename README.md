@@ -5,8 +5,17 @@ An alternative to fail2ban that only uses one script file instead of modules and
 This script utilizes the inotify functionality. The inotify-tools tools package needs to be installed.
 
 ## Usage
-- When needed, add more log files at the top of the script (see in-code comments).
-- Run the script either as a background process or in an ordinary terminal instance.
+Input up to five log files as arguments.
+Example:
+```./fail2deny.sh /var/log/auth.log /var/log/vsftpd.log```
+
+### Running in Docker
+Build example:
+```docker build . -t fail2deny```
+
+You need to mount your hosts.deny file and log folder when running. The log files to be monitored need to be passed as arguments Just like when the script is running individually.
+Run example:
+```docker run -v /etc/hosts.deny:/etc/hosts.deny -v /var/log:/var/log:ro fail2deny /var/log/auth.log``` 
 
 ## License
 

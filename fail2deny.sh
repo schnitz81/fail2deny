@@ -1,32 +1,34 @@
 #!/bin/bash
 
-file1='/var/log/auth.log'
+if [ $# -lt 1 ]; then
+    echo "Need one or more paths to log file."
+    exit 1
+fi
 
-# *********************************** In case of more log files, change the "/dev/null" dummies to file paths. 
-file2='/dev/null'
-file3='/dev/null'
-file4='/dev/null'
-file5='/dev/null'
-
+file1="$1"
+file2="$2"
+file3="$3"
+file4="$4"
+file5="$5"
 
 denyfile='/etc/hosts.deny'
 
-failstrings='-i -e fail -e Invalid'  # ******************** Search words (case insensitive). The strings in log that are considered fail attempts. 
+failstrings='-i -e fail'  # ******************** Search words (case insensitive). The strings in log that are considered fail attempts. 
 allowstrings='-v -i -e check -e pam_unix'  # ************************** Exceptions strings that will override the search words.
 
 echo -n "$(date +"%Y%m%d %H:%M:%S")  "  # Put timestamp
 echo "Starting to monitoring files..."
 # loop
-inotifywait -m -e modify -q $file1 $file2 $file3 $file4 $file5 | while read file
+inotifywait -m -e modify -q "$file1" "$file2" "$file3" "$file4" "$file5" | while read file
 do
 	echo "--------------------"
 	echo -n "$(date +"%Y%m%d %H:%M:%S")  "  # Put timestamp
 	echo "Change in logfile detected. Analyzing log files..."
 	
-	for logfile in $file1 $file2 $file3 $file4 $file5; do 
+	for logfile in "$file1" "$file2" "$file3" "$file4" "$file5"; do 
 
-		# Skip loop iteration if file is dummy
-		if [ ! -f $logfile ]; then
+		# Skip loop iteration if file is dummy or empty
+		if [ ! -f $logfile ] || ! [[ "$logfile" =~ [^a-zA-Z0-9\ ] ]]; then
 			continue
 		fi
 
