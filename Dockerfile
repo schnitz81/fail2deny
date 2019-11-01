@@ -6,9 +6,9 @@ RUN chmod +x /fail2deny.sh
 ENTRYPOINT ["/fail2deny.sh"]
 
 # Build:
-$ docker build . -t fail2deny
+# $ docker build . -t fail2deny
 
 # Run:
-$ docker run -v /etc/hosts.deny:/etc/hosts.deny -v /var/log:/var/log:ro fail2deny /var/log/auth.log
+# $ docker run -d --rm --name fail2deny -v /etc/hosts.deny:/etc/hosts.deny -v /var/log:/var/log:ro fail2deny /var/log/auth.log 
 
-# (Add more log file paths to the run command for additional monitoring) 
+# (Add more log file paths to the run command for additional monitoring)
