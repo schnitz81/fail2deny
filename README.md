@@ -15,7 +15,7 @@ Build example:
 
 You need to mount your hosts.deny file and log folder when running. The log files to be monitored need to be passed as arguments Just like when the script is running individually.
 Run example:
-```docker run -v /etc/hosts.deny:/etc/hosts.deny -v /var/log:/var/log:ro fail2deny /var/log/auth.log``` 
+```docker run -d --rm --name fail2deny -v /etc/hosts.deny:/etc/hosts.deny -v /var/log:/var/log:ro fail2deny /var/log/auth.log``` 
 
 ## License
 
