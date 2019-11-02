@@ -17,6 +17,9 @@ You need to mount your hosts.deny file and log folder when running. The log file
 Run example:
 ```docker run -d --rm --name fail2deny -v /etc/hosts.deny:/etc/hosts.deny -v /var/log:/var/log:ro fail2deny /var/log/auth.log``` 
 
+To see the events of the detached container in realtime:
+```docker logs -f (CONTAINER ID)```
+
 ## License
 
 MIT License
