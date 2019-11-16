@@ -11,21 +11,24 @@ file3="$3"
 file4="$4"
 file5="$5"
 
-denyfile='/etc/hosts.deny'
+DENYFILE='/etc/hosts.deny'
 
-failstrings='-i -e fail'  # ******************** Search words (case insensitive). The strings in log that are considered fail attempts. 
-allowstrings='-v -i -e check -e pam_unix'  # ************************** Exceptions strings that will override the search words.
+PAST_TIME_LIMIT=300  # past time in seconds to disallow failed logins
+MAX_NO_OF_FAILS=4    # more fail logins than this will result in an IP ban
 
-echo -n "$(date +"%Y%m%d %H:%M:%S")  "  # Put timestamp
+failstrings='-i -e fail'                   # Search words (case insensitive). The strings in log that are considered fail attempts.
+allowstrings='-v -i -e check -e pam_unix'  # Exceptions strings that will override the search words.
+
+echo -n "$(date +"%Y%m%d %H:%M:%S")  "  # put timestamp
 echo "Starting to monitoring files..."
-# loop
+
 inotifywait -m -e modify -q "$file1" "$file2" "$file3" "$file4" "$file5" | while read file
 do
-	echo "--------------------"
-	echo -n "$(date +"%Y%m%d %H:%M:%S")  "  # Put timestamp
+	echo "-------------------"
+	echo -n "$(date +"%Y%m%d %H:%M:%S")  "  # put timestamp
 	echo "Change in logfile detected. Analyzing log files..."
-	
-	for logfile in "$file1" "$file2" "$file3" "$file4" "$file5"; do 
+
+	for logfile in "$file1" "$file2" "$file3" "$file4" "$file5"; do
 
 		# Skip loop iteration if file is dummy or empty
 		if [ ! -f $logfile ] || ! [[ "$logfile" =~ [^a-zA-Z0-9\ ] ]]; then
@@ -33,46 +36,47 @@ do
 		fi
 
 		# Find last IP with failed login.
-		echo "Checking $logfile..." 
+		echo "Checking $logfile..."
 		ipToCheck=`cat $logfile | grep $failstrings | grep $allowstrings | grep -o '[0-9]\+[.][0-9]\+[.][0-9]\+[.][0-9]\+' | tail -n 1`
-	
-		if [[ ! -z  $ipToCheck ]]; then  # if not empty string
+
+		if [[ ! -z $ipToCheck ]]; then  # if not empty string
 			echo
 			echo "IP number $ipToCheck has made one or more failed access attempts."
 			echo
 			echo -n "No of failed access attempts: "
-			echo `grep $ipToCheck $logfile | grep $failstrings | grep $allowstrings | wc -l`   # Print no of occurances
+			echo `grep $ipToCheck $logfile | grep $failstrings | grep $allowstrings | wc -l`  # print no of occurances
 			echo
-			if [ `grep $ipToCheck $logfile | grep $failstrings | grep $allowstrings | wc -l` -gt 4 ]; then  # Check if no of occurances > 4
-				fiveTimeStampsAgo=`cat $logfile | grep -e $ipToCheck $failstrings | grep $allowstrings | tail -n 5 | grep -o '[0-9]\{2\}\:[0-9]\{2\}' | head -n 1`  # Get fifth last time
+			if [ `grep $ipToCheck $logfile | grep $failstrings | grep $allowstrings | wc -l` -gt $MAX_NO_OF_FAILS ]; then  # check if no of occurances is more than allowed
+				fiveTimestampsAgo=`cat $logfile | grep -e $ipToCheck $failstrings | grep $allowstrings | cut -d ' ' -f -3 | tail -n $((MAX_NO_OF_FAILS+1)) | head -n 1`  # get fifth last time
 			else
-				echo "Less than five occurances. Will not ban."; echo "-------------------"; continue  # Break loop iteration.
+				echo "Less than five occurances. Will not ban."; echo "-------------------"; continue  # break loop iteration
 			fi
-		else 
-			echo "No IP found to analyze."; echo "-------------------"; continue  # Break loop iteration.
-		fi  
-		
-		NOW=$(date +"%T")
-		_5MINSAGO=$(date --date="-5 minutes" +"%T")
+		else
+			echo "No IP found to analyze."; echo "-------------------"; continue  # break loop iteration
+		fi
 
-		echo now:                  $NOW
-		echo five mins ago:        $_5MINSAGO
-		echo five time stamps ago: $fiveTimeStampsAgo
-		echo 
+		epochNow=$(date +"%s")
+		epochPastLimit=$((epochNow-PAST_TIME_LIMIT))
+		epochFiveTimestampsAgo=$(date -d "${fiveTimestampsAgo}" +"%s")  # convert the log timestamp to epoch
 
-		# Check timespan and ban if less than 5 minutes. 
-		if [[ $fiveTimeStampsAgo > $_5MINSAGO ]]; then
-			echo "Less than five minutes between the 5 latest fail logins. Will ban."
-			echo "Checking for IP in deny file..." 
-			if ! grep -q $ipToCheck $denyfile ; then
-				echo "Banning IP..."
-				echo "ALL: $ipToCheck" >> $denyfile
+		echo "                 now: $epochNow"
+		echo "oldest allowed epoch: $epochPastLimit"
+		echo "      no $((MAX_NO_OF_FAILS+1)) timestamp: $epochFiveTimestampsAgo ($fiveTimestampsAgo)"
+		echo
+
+		# Check timespan and ban if less than 5 minutes.
+		if [[ $epochFiveTimestampsAgo > $epochPastLimit ]]; then
+			echo "Less than $PAST_TIME_LIMIT seconds between the $((MAX_NO_OF_FAILS+1)) latest fail logins. Will ban."
+			echo "Checking for IP in deny file..."
+			if ! grep -q $ipToCheck $DENYFILE ; then
+				echo "*Banning IP*"
+				echo "ALL: $ipToCheck" >> $DENYFILE
 			else
 				echo "IP already in deny file."
 			fi
 		else
-			echo "More than five minutes between fail logins. Not banning."
+			echo "More than $PAST_TIME_LIMIT seconds between fail logins. Not banning."
 		fi
-		echo "--------------------"
+		echo "-------------------"
 	done 
 done
