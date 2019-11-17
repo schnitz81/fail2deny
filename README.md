@@ -2,7 +2,7 @@
 An alternative to fail2ban that only uses one script file instead of modules and bans in the tcp wrapper instead of iptables.
 
 ## Requirements
-This script utilizes the inotify functionality. The inotify-tools tools package needs to be installed.
+This script utilizes the inotify functionality. The inotify tools package needs to be installed.
 
 ## Usage
 Input up to five log files as arguments.

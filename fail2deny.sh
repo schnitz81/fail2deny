@@ -24,7 +24,7 @@ echo "Starting to monitoring files..."
 
 inotifywait -m -e modify -q "$file1" "$file2" "$file3" "$file4" "$file5" | while read file
 do
-	( echo "-------------------"
+	echo "-------------------"
 	echo -n "$(date +"%Y%m%d %H:%M:%S")  "  # put timestamp
 	echo "Change in logfile detected. Analyzing log files..."
 
@@ -79,6 +79,5 @@ do
 		fi
 		echo "-------------------"
 
-	done ) &
-	disown
+	done
 done
