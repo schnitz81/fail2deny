@@ -37,7 +37,7 @@ do
 
 		# Find last IP with failed login.
 		echo "Checking $logfile..."
-		ipToCheck=`cat $logfile | grep -o '[0-9]\+[.][0-9]\+[.][0-9]\+[.][0-9]\+' | grep $failstrings | grep $allowstrings | tail -n 1`
+		ipToCheck=`cat $logfile | grep $failstrings | grep $allowstrings | grep -o '[0-9]\+[.][0-9]\+[.][0-9]\+[.][0-9]\+' | tail -n 1`
 
 		if [[ ! -z $ipToCheck ]]; then  # if not empty string
 			echo
