@@ -37,13 +37,13 @@ do
 
 		# Find last IP with failed login.
 		echo "Checking $logfile..."
-		ipToCheck=`cat $logfile | grep $failstrings | grep $allowstrings | grep -o '[0-9]\+[.][0-9]\+[.][0-9]\+[.][0-9]\+' | tail -n 1`
+		ipToCheck=`cat $logfile | grep $failstrings | grep $allowstrings | grep -wo '[0-9]\+[.][0-9]\+[.][0-9]\+[.][0-9]\+' | tail -n 1`
 
 		if [[ ! -z $ipToCheck ]]; then  # if not empty string
 
 			echo
 			echo -n "Checking if IP: $ipToCheck is banned..."
-                        if grep -q $ipToCheck $DENYFILE ; then  # do nothing more if IP is already banned
+                        if grep -wq $ipToCheck $DENYFILE ; then  # do nothing more if IP is already banned
                                 echo "yes"
 				continue
 			else
@@ -54,10 +54,10 @@ do
 			echo "IP: $ipToCheck has made one or more failed access attempts."
 			echo
 			echo -n "No of failed access attempts: "
-			echo `grep $ipToCheck $logfile | grep $failstrings | grep $allowstrings | wc -l`  # print no of occurances
+			echo `grep -w $ipToCheck $logfile | grep $failstrings | grep $allowstrings | wc -l`  # print no of occurances
 			echo
-			if [ `grep $ipToCheck $logfile | grep $failstrings | grep $allowstrings | wc -l` -gt $MAX_NO_OF_FAILS ]; then  # check if no of occurances is more than allowed
-				fiveTimestampsAgo=`cat $logfile | grep -e $ipToCheck $failstrings | grep $allowstrings | cut -d ' ' -f -3 | tail -n $((MAX_NO_OF_FAILS+1)) | head -n 1`  # get fifth last time
+			if [ `grep -w $ipToCheck $logfile | grep $failstrings | grep $allowstrings | wc -l` -gt $MAX_NO_OF_FAILS ]; then  # check if no of occurances is more than allowed
+				fiveTimestampsAgo=`cat $logfile | grep -we $ipToCheck $failstrings | grep $allowstrings | cut -d ' ' -f -3 | tail -n $((MAX_NO_OF_FAILS+1)) | head -n 1`  # get fifth last time
 			else
 				echo "Less than five occurances. Will not ban."; continue  # break loop iteration
 			fi
