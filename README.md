@@ -1,5 +1,6 @@
 # fail2deny
 An alternative to fail2ban that only uses one script file instead of modules and bans in the tcp wrapper instead of iptables.
+Automatic banning of IPv4 addresses after too many failed login attempts.
 
 ## Requirements
 This script utilizes the inotify functionality. The inotify tools package needs to be installed.
