@@ -57,9 +57,9 @@ do
 			echo `grep -w $ipToCheck $logfile | grep $failstrings | grep $allowstrings | wc -l`  # print no of occurances
 			echo
 			if [ `grep -w $ipToCheck $logfile | grep $failstrings | grep $allowstrings | wc -l` -gt $MAX_NO_OF_FAILS ]; then  # check if no of occurances is more than allowed
-				fiveTimestampsAgo=`cat $logfile | grep -we $ipToCheck | grep $failstrings | grep $allowstrings | cut -d ' ' -f -3 | tail -n $((MAX_NO_OF_FAILS+1)) | head -n 1`  # get fifth last time
+				maxAllowedTimestamp=`cat $logfile | grep -we $ipToCheck | grep $failstrings | grep $allowstrings | cut -d ' ' -f -3 | tail -n $((MAX_NO_OF_FAILS+1)) | head -n 1`  # get fifth last time
 			else
-				echo "Less than five occurances. Will not ban."; continue  # break loop iteration
+				echo "Less than $((MAX_NO_OF_FAILS+1)) occurances. Will not ban."; continue  # break loop iteration
 			fi
 		else
 			echo "No IP found to analyze."; continue  # break loop iteration
@@ -67,15 +67,15 @@ do
 
 		epochNow=$(date +"%s")
 		epochPastLimit=$((epochNow-PAST_TIME_LIMIT))
-		epochFiveTimestampsAgo=$(date -d "${fiveTimestampsAgo}" +"%s")  # convert the log timestamp to epoch
+		epochMaxAllowedTimestamp=$(date -d "${maxAllowedTimestamp}" +"%s")  # convert the log timestamp to epoch
 
 		echo "                 now: $epochNow"
 		echo "oldest allowed epoch: $epochPastLimit"
-		echo "      no $((MAX_NO_OF_FAILS+1)) timestamp: $epochFiveTimestampsAgo ($fiveTimestampsAgo)"
+		echo " no $((MAX_NO_OF_FAILS+1)) past timestamp: $epochMaxAllowedTimestamp ($maxAllowedTimestamp)"
 		echo
 
 		# Check timespan and ban if less than 5 minutes.
-		if [[ $epochFiveTimestampsAgo > $epochPastLimit ]]; then
+		if [[ $epochMaxAllowedTimestamp > $epochPastLimit ]]; then
 			echo "Less than $PAST_TIME_LIMIT seconds between the $((MAX_NO_OF_FAILS+1)) latest fail logins. Will ban."
 			echo 
 			echo "*** Banning IP: $ipToCheck ***"
