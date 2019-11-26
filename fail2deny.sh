@@ -42,8 +42,6 @@ do
 		if [[ ! -z $ipToCheck ]]; then  # if not empty string
 
 			echo
-			echo "IP: $ipToCheck has made one or more failed access attempts."
-			echo
 			echo -n "Checking if IP: $ipToCheck is banned..."
                         if grep -wq $ipToCheck $DENYFILE ; then  # do nothing more if IP is already banned
                                 echo "yes"
@@ -57,7 +55,7 @@ do
 			echo `grep -w $ipToCheck $logfile | grep $failstrings | grep $allowstrings | wc -l`  # print no of occurances
 			echo
 			if [ `grep -w $ipToCheck $logfile | grep $failstrings | grep $allowstrings | wc -l` -gt $MAX_NO_OF_FAILS ]; then  # check if no of occurances is more than allowed
-				maxAllowedTimestamp=`cat $logfile | grep -we $ipToCheck | grep $failstrings | grep $allowstrings | cut -d ' ' -f -3 | tail -n $((MAX_NO_OF_FAILS+1)) | head -n 1`  # get fifth last time
+				earliestOccurrenceWithinTimespan=`cat $logfile | grep -we $ipToCheck | grep $failstrings | grep $allowstrings | cut -d ' ' -f -3 | tail -n $((MAX_NO_OF_FAILS+1)) | head -n 1`  # get earliest timestamp within timespan
 			else
 				echo "Less than $((MAX_NO_OF_FAILS+1)) occurances. Will not ban."; continue  # break loop iteration
 			fi
@@ -67,15 +65,15 @@ do
 
 		epochNow=$(date +"%s")
 		epochPastLimit=$((epochNow-PAST_TIME_LIMIT))
-		epochMaxAllowedTimestamp=$(date -d "${maxAllowedTimestamp}" +"%s")  # convert the log timestamp to epoch
+		epochEarliestOccurrenceWithinTimespan=$(date -d "${earliestOccurrenceWithinTimespan}" +"%s")  # convert the log timestamp to epoch
 
 		echo "                 now: $epochNow"
 		echo "oldest allowed epoch: $epochPastLimit"
-		echo " no $((MAX_NO_OF_FAILS+1)) past timestamp: $epochMaxAllowedTimestamp ($maxAllowedTimestamp)"
+		echo " no $((MAX_NO_OF_FAILS+1)) past timestamp: $epochEarliestOccurrenceWithinTimespan ($earliestOccurrenceWithinTimespan)"
 		echo
 
 		# Check timespan and ban if less than 5 minutes.
-		if [[ $epochMaxAllowedTimestamp > $epochPastLimit ]]; then
+		if [[ $epochEarliestOccurrenceWithinTimespan > $epochPastLimit ]]; then
 			echo "Less than $PAST_TIME_LIMIT seconds between the $((MAX_NO_OF_FAILS+1)) latest fail logins. Will ban."
 			echo 
 			echo "*** Banning IP: $ipToCheck ***"
