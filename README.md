@@ -7,18 +7,18 @@ This script utilizes the inotify functionality. The inotify tools package needs 
 
 ## Usage
 Input up to five log files as arguments.
-Example:
+Example:<br>
 ```./fail2deny.sh /var/log/auth.log /var/log/vsftpd.log```
 
 ### Running in Docker
-Build example:
+Build example:<br>
 ```docker build . -t fail2deny```
 
 You need to mount your hosts.deny file and log folder when running. The log files to be monitored need to be passed as arguments Just like when the script is running individually.
-Run example:
+Run example:<br>
 ```docker run -d --rm --name fail2deny -v /etc/hosts.deny:/etc/hosts.deny -v /var/log:/var/log:ro fail2deny /var/log/auth.log``` 
 
-To see the events of the detached container in realtime:
+To see the events of the detached container in realtime:<br>
 ```docker logs -f (CONTAINER ID)```
 
 ## License
