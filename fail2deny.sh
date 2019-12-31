@@ -63,6 +63,7 @@ while true; do  # restart loop for inode release in case of logrotation
 				echo
 				if [ `grep -w $ipToCheck $logfile | grep $FAILSTRINGS | grep $ALLOWSTRINGS | wc -l` -gt $MAX_NO_OF_FAILS ]; then  # check if no of occurances is more than allowed
 					earliestOccurrenceWithinTimespan=`cat $logfile | grep -we $ipToCheck | grep $FAILSTRINGS | grep $ALLOWSTRINGS | cut -d ' ' -f -3 | tail -n $((MAX_NO_OF_FAILS+1)) | head -n 1`  # get earliest timestamp within timespan
+					lastOccurrenceWithinTimespan=`cat $logfile | grep -we $ipToCheck | grep $FAILSTRINGS | grep $ALLOWSTRINGS | cut -d ' ' -f -3 | tail -n 1`  # get last timestamp
 				else
 					echo "Less than $((MAX_NO_OF_FAILS+1)) occurances. Will not ban."; continue  # break loop iteration
 				fi
@@ -70,12 +71,12 @@ while true; do  # restart loop for inode release in case of logrotation
 				echo "No IP found to analyze."; continue  # break loop iteration
 			fi
 
-			epochNow=$(date +"%s")
-			epochPastLimit=$((epochNow-PAST_TIME_LIMIT))
-			epochEarliestOccurrenceWithinTimespan=$(date -d "${earliestOccurrenceWithinTimespan}" +"%s")  # convert the log timestamp to epoch
+			epochLastOccurrenceWithinTimespan=$(date -d "${lastOccurrenceWithinTimespan}" +"%s")  # convert log timestamp to epoch
+			epochPastLimit=$((epochLastOccurrenceWithinTimespan-PAST_TIME_LIMIT))  # calculate oldest relevant time for log timestamps 
+			epochEarliestOccurrenceWithinTimespan=$(date -d "${earliestOccurrenceWithinTimespan}" +"%s")  # convert log timestamp to epoch
 
-			echo "                 now: $epochNow"
-			echo "oldest allowed epoch: $epochPastLimit"
+			echo "          last epoch: $epochLastOccurrenceWithinTimespan ($lastOccurrenceWithinTimespan)"
+			echo "oldest allowed epoch: $epochPastLimit ($PAST_TIME_LIMIT seconds diff)"
 			echo " no $((MAX_NO_OF_FAILS+1)) past timestamp: $epochEarliestOccurrenceWithinTimespan ($earliestOccurrenceWithinTimespan)"
 			echo
 
