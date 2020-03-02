@@ -62,8 +62,8 @@ while true; do  # restart loop for inode release in case of logrotation
 				echo `grep -w $ipToCheck $logfile | grep $FAILSTRINGS | grep $ALLOWSTRINGS | wc -l`  # print no of occurances
 				echo
 				if [ `grep -w $ipToCheck $logfile | grep $FAILSTRINGS | grep $ALLOWSTRINGS | wc -l` -gt $MAX_NO_OF_FAILS ]; then  # check if no of occurances is more than allowed
-					earliestOccurrenceWithinTimespan=`cat $logfile | grep -we $ipToCheck | grep $FAILSTRINGS | grep $ALLOWSTRINGS | cut -d ' ' -f -3 | tail -n $((MAX_NO_OF_FAILS+1)) | head -n 1`  # get earliest timestamp within timespan
-					lastOccurrenceWithinTimespan=`cat $logfile | grep -we $ipToCheck | grep $FAILSTRINGS | grep $ALLOWSTRINGS | cut -d ' ' -f -3 | tail -n 1`  # get last timestamp
+					earliestOccurrenceWithinTimespan=`cat $logfile | grep -we $ipToCheck | grep $FAILSTRINGS | grep $ALLOWSTRINGS | tr -s ' ' | cut -d ' ' -f -3 | tail -n $((MAX_NO_OF_FAILS+1)) | head -n 1`  # get earliest timestamp within timespan
+					lastOccurrenceWithinTimespan=`cat $logfile | grep -we $ipToCheck | grep $FAILSTRINGS | grep $ALLOWSTRINGS | tr -s ' ' | cut -d ' ' -f -3 | tail -n 1`  # get last timestamp
 				else
 					echo "Less than $((MAX_NO_OF_FAILS+1)) occurances. Will not ban."; continue  # break loop iteration
 				fi
