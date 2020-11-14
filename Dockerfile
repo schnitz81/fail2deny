@@ -1,6 +1,6 @@
-FROM alpine
-RUN apk update
-RUN apk add coreutils bash inotify-tools
+FROM alpine:3.12
+RUN apk --no-cache update
+RUN apk --no-cache add coreutils bash inotify-tools
 COPY fail2deny.sh /
 RUN chmod +x /fail2deny.sh
 ENTRYPOINT ["/fail2deny.sh"]
