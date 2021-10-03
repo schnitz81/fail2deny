@@ -2,8 +2,22 @@
 An alternative to fail2ban that only uses one script file instead of modules and bans in the tcp wrapper instead of iptables.
 Automatic banning of IPv4 addresses after too many failed login attempts.
 
+## TCP wrapper or iptables
+Two versions are included. One utilizing TCP wrappers and one using iptables.
+
+### TCP wrapper:
+- Accessing /etc/hosts.deny for banning.
+- Permanent bans only.
+- Docker build available for running as container.
+
+### iptables:
+- Accessing iptables directly.
+- Creating and using /etc/fail2deny.list for internal use.
+- Temporary bans (ban time can be set in the .sh file).
+- No Docker version, because there is no standard solution for accessing iptables in the host and such practice is not recommended.
+
 ## Requirements
-This script utilizes the inotify functionality. The inotify tools package needs to be installed.
+This script utilizes the inotify functionality. The inotify tools package needs to be installed. Depending on version used, a TCP wrapper utility or iptables needs to be installed as well.
 
 ## Usage
 Input up to five log files as arguments.
