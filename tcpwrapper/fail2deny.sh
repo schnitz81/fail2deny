@@ -5,8 +5,8 @@ DENYFILE='/etc/hosts.deny'
 PAST_TIME_LIMIT=3600  # past time in seconds to disallow failed logins
 MAX_NO_OF_FAILS=11    # more fail logins than this will result in an IP ban
 
-FAILSTRINGS="-i -e fail -e invalid[[:space:]]user"  # Search words (case insensitive). The strings in log that are considered fail attempts.
-ALLOWSTRINGS="-v -i -e check -e pam_unix"           # Exceptions strings that will override the search words.
+FAILSTRINGS="-i -e fail -e invalid[[:space:]]user"        # Search words (case insensitive). The strings in log that are considered fail attempts.
+ALLOWSTRINGS="-v -i -e check -e pam_unix -e '127.0.0.1'"  # Exceptions strings that will override the search words.
 
 # check if inotify is installed
 if [ -z "$(which inotifywait)" ] ; then
