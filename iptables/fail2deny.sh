@@ -1,15 +1,15 @@
 #!/bin/bash
 set -x
 
-PAST_TIME_LIMIT=$((60*60))  # past time in seconds to disallow failed logins
+PAST_TIME_LIMIT=$((60*20))  # past time in seconds to disallow failed logins
 MAX_NO_OF_FAILS=11   # more fail logins than this will result in an IP ban
-BANTIME=$((60*60))
+BANTIME=$((60*20))
 
 LIST_FILE="/etc/fail2deny.list"
-EVENT_LOG="/tmp/fail2deny.log"
+EVENT_LOG="/var/log/fail2deny.log"
 
-FAILSTRINGS="-i -e fail -e invalid[[:space:]]user"        # Search words (case insensitive). The strings in log that are considered fail attempts.
-ALLOWSTRINGS="-v -i -e check -e pam_unix -e '127.0.0.1'"  # Exceptions strings that will override the search words.
+FAILSTRINGS="-i -e fail -e invalid[[:space:]]user"  # Search words (case insensitive). The strings in log that are considered fail attempts.
+ALLOWSTRINGS="-v -i -e check -e pam_unix -e '127.0.0.1'"           # Exceptions strings that will override the search words.
 
 IPTABLES_CMD=$(which iptables)
 
@@ -27,37 +27,38 @@ function get_max_wait_time () {
 	fi
 }
 
+
 function ban_and_unban () {
 	while IFS= read -r line; do
 
 		local epochNow=$(date +"%s")
 		local expiredBanTime=$((epochNow-BANTIME))
-		local lineEpoch=$(echo "$line" | xargs | cut -d ' ' -f 1)
-		local lineIp=$(echo "$line" | xargs | cut -d ' ' -f 2)
+		local listEpoch=$(echo "$line" | xargs | cut -d ' ' -f 1)
+		local listIp=$(echo "$line" | xargs | cut -d ' ' -f 2)
 		local iptablesIpOccurance=0
 
-		if ! [[ $lineIp =~ [0-9] ]]; then  # skip rest if line doesn't contain any digits
+		if ! [[ $listIp =~ [0-9] ]]; then  # skip rest if line doesn't contain any digits
 			continue
 		fi
 		# unban expired records
-		if [[ $lineEpoch -le $expiredBanTime ]]; then
-			remove_ip "$lineIp"  # remove line from list file
-			$IPTABLES_CMD -D INPUT -s "$lineIp" -j DROP  # unban IP from iptables
+		if [[ $listEpoch -le $expiredBanTime ]]; then
+			remove_ip "$listIp"  # remove line from list file
+			$IPTABLES_CMD -D INPUT -s "$listIp" -j DROP  # unban IP from iptables
 
 		# ban new records
-		elif [[ $lineEpoch -gt $expiredBanTime ]]; then
+		elif [[ $listEpoch -gt $expiredBanTime ]]; then
 			# check if IP is already banned by analyzing iptables output
 			mapfile iptablesOutput < <($IPTABLES_CMD -L INPUT -v -n)  # get iptables output
-			if echo "${iptablesOutput[@]}" | fgrep -w "$lineIp"; then  # check for IP in iptables output
+			if echo "${iptablesOutput[@]}" | fgrep -w "$listIp"; then  # check for IP in iptables output
 				iptablesIpOccurance=1  # occurence is true
 			fi
 			if [[ $iptablesIpOccurance -lt 1 ]]; then  # if IP doesn't occur in iptables
-				$IPTABLES_CMD -A INPUT -s "$lineIp" -j DROP  # ban ip
-				echo "********** $lineIp banned **********"
+				$IPTABLES_CMD -A INPUT -s "$listIp" -j DROP  # ban ip
+				echo "********** $listIp banned **********"
 
 				# log event
 				echo -n "$(date +"%Y%m%d %H:%M:%S")  " >> $EVENT_LOG # put timestamp
-				echo "$lineIp banned" >> $EVENT_LOG
+				echo "$listIp banned" >> $EVENT_LOG
 			else  
 				echo "IP already in iptables."
 			fi
@@ -69,11 +70,11 @@ function ban_and_unban () {
 function remove_ip () {
 	local ipToUnban=$1
 	sed -i "/$ipToUnban/d" $LIST_FILE  # remove IP from list file
-	echo "$lineIp unbanned."
+	echo "$listIp unbanned."
 
 	# log event
 	echo -n "$(date +"%Y%m%d %H:%M:%S")  " >> $EVENT_LOG # put timestamp
-	echo "$lineIp unbanned" >> $EVENT_LOG
+	echo "$listIp unbanned" >> $EVENT_LOG
 }
 
 
@@ -161,8 +162,8 @@ while true; do  # main loop
 				echo "$(grep -w $ipToCheck $logfile | grep $FAILSTRINGS | grep $ALLOWSTRINGS | wc -l)"  # print no of occurances
 				echo
 				if [ "$(grep -w $ipToCheck $logfile | grep $FAILSTRINGS | grep $ALLOWSTRINGS | wc -l)" -gt "$MAX_NO_OF_FAILS" ]; then  # check if no of occurances is more than allowed
-					earliestOccurrenceWithinTimespan=$(cat $logfile | grep -we $ipToCheck | grep $FAILSTRINGS | grep $ALLOWSTRINGS | tr -s ' ' | cut -d ' ' -f -3 | tail -n $((MAX_NO_OF_FAILS+1)) | head -n 1)  # get earliest timestamp within timespan
-					lastOccurrenceWithinTimespan=$(cat "$logfile" | grep -we $ipToCheck | grep $FAILSTRINGS | grep $ALLOWSTRINGS | tr -s ' ' | cut -d ' ' -f -3 | tail -n 1)  # get last timestamp
+					earliestOccurrenceWithinTimespan=$(cat $logfile | grep -we $ipToCheck | grep $FAILSTRINGS | grep $ALLOWSTRINGS | tr -s ' ' | cut -d ' ' -f 1 | tail -n $((MAX_NO_OF_FAILS+1)) | head -n 1)  # get earliest timestamp within timespan
+					lastOccurrenceWithinTimespan=$(cat "$logfile" | grep -we $ipToCheck | grep $FAILSTRINGS | grep $ALLOWSTRINGS | tr -s ' ' | cut -d ' ' -f 1 | tail -n 1)  # get last timestamp
 				else
 					echo "Less than $((MAX_NO_OF_FAILS+1)) occurances. Will not ban."; continue  # break loop iteration
 				fi
