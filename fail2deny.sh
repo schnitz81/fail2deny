@@ -1,20 +1,44 @@
 #!/bin/bash
 set -x
 
-PAST_TIME_LIMIT=$((60*20))  # past time in seconds to disallow failed logins
-MAX_NO_OF_FAILS=11   # more fail logins than this will result in an IP ban
-BANTIME=$((60*20))
-
-LIST_FILE="/etc/fail2deny.list"
+BANTIME=$((60*20))   # seconds long bantime
 EVENT_LOG="/var/log/fail2deny.log"
 
-FAILSTRINGS="-i -e fail -e invalid[[:space:]]user"  # Search words (case insensitive). The strings in log that are considered fail attempts.
-ALLOWSTRINGS="-v -i -e check -e pam_unix -e '127.0.0.1'"           # Exceptions strings that will override the search words.
+PAST_TIME_LIMIT=$((60*20))  # past time in seconds to disallow failed logins
+MAX_NO_OF_FAILS=11   # more fail occurances than this will result in an IP ban
+LIST_FILE="/etc/fail2deny.list"
 
-IPTABLES_CMD=$(which iptables)
+
+FAILSTRINGS="-i -e fail -e invalid[[:space:]]user"  # Search words (case insensitive). The strings in log that are considered fail attempts.
+ALLOWSTRINGS="-v -i -e check -e pam_unix -e '127.0.0.1'"  # Exceptions strings that will override the search words.
+
+# get firewall mgr path
+if $(which iptables >/dev/null); then
+	FWMGR_CMD=$(which iptables)
+elif $(which nft >/dev/null); then
+	FWMGR_CMD=$(which nft)
+else
+	echo "Error: No firewall manager found. nft or iptables needs to be in PATH."; exit 1
+fi
 
 
 ############################### FUNCTIONS ##########################################
+
+
+function dateparsing () {
+	# Check what no of cols generates a valid date parsing and return the no. of cols
+	if $(date -d "$(tail -n 1 $1 | tr -s ' ' | awk '{print $1, $2, $3, $4}')" +"%s" 1>/dev/null 2>&1); then
+		echo "4"
+	elif $(date -d "$(tail -n 1 $1 | tr -s ' ' | awk '{print $1, $2, $3}')" +"%s" 1>/dev/null 2>&1); then
+		echo "3"
+	elif $(date -d "$(tail -n 1 $1 | tr -s ' ' | awk '{print $1, $2}')" +"%s" 1>/dev/null 2>&1); then
+		echo "2"
+	elif $(date -d "$(tail -n 1 $1 | tr -s ' ' | awk '{print $1}')" +"%s" 1>/dev/null 2>&1); then
+		echo "1"
+	else
+		echo "Error: Unable to parse date in log file $1"; exit 1
+	fi
+}
 
 
 function get_max_wait_time () {
@@ -29,6 +53,19 @@ function get_max_wait_time () {
 
 
 function ban_and_unban () {
+
+	# set nftables set and rule
+	if [[ "$FWMGR_CMD" =~ "nft" ]]; then
+
+		# create set, can be run every time since same name sets aren't created
+		$FWMGR_CMD add set ip filter fail2deny { type ipv4_addr\; }
+
+		# add rule if missing
+		if ! $(nft list ruleset | grep -q 'ip saddr @fail2deny drop'); then
+			$FWMGR_CMD add rule ip filter INPUT ip saddr @fail2deny drop
+		fi
+	fi
+
 	while IFS= read -r line; do
 
 		local epochNow=$(date +"%s")
@@ -43,23 +80,38 @@ function ban_and_unban () {
 		# unban expired records
 		if [[ $listEpoch -le $expiredBanTime ]]; then
 			remove_ip "$listIp"  # remove line from list file
-			$IPTABLES_CMD -D INPUT -s "$listIp" -j DROP  # unban IP from iptables
+			if [[ "$FWMGR_CMD" =~ "nft" ]]; then  # unban command depending on fwmgr choice
+				$FWMGR_CMD delete element ip filter fail2deny { $listIp }  # unban ip in nftables
+			else
+				$FWMGR_CMD -D INPUT -s "$listIp" -j DROP  # unban IP in iptables
+			fi
 
 		# ban new records
 		elif [[ $listEpoch -gt $expiredBanTime ]]; then
-			# check if IP is already banned by analyzing iptables output
-			mapfile iptablesOutput < <($IPTABLES_CMD -L INPUT -v -n)  # get iptables output
-			if echo "${iptablesOutput[@]}" | fgrep -w "$listIp"; then  # check for IP in iptables output
-				iptablesIpOccurance=1  # occurence is true
+
+			# check if IP is already banned by analyzing fwmgr output
+			if [[ "$FWMGR_CMD" =~ "nft" ]]; then
+				if nft list ruleset | awk '/fail2deny/{flag=1} flag; /}/{exit}' | grep -Fw "$listIp"; then  # check for IP in nftables output
+					iptablesIpOccurance=1  # occurence is true
+				fi
+			else
+				mapfile iptablesOutput < <($FWMGR_CMD -L INPUT -v -n)  # get iptables output
+				if echo "${iptablesOutput[@]}" | grep -Fw "$listIp"; then  # check for IP in iptables output
+					iptablesIpOccurance=1  # occurence is true
+				fi
 			fi
-			if [[ $iptablesIpOccurance -lt 1 ]]; then  # if IP doesn't occur in iptables
-				$IPTABLES_CMD -A INPUT -s "$listIp" -j DROP  # ban ip
+			if [[ $iptablesIpOccurance -lt 1 ]]; then  # if IP doesn't occur in fwmgr
+				if [[ "$FWMGR_CMD" =~ "nft" ]]; then
+					$FWMGR_CMD add element ip filter fail2deny { $listIp }  # ban ip in nftables
+				else
+					$FWMGR_CMD -A INPUT -s "$listIp" -j DROP  # ban ip in iptables
+				fi
 				echo "********** $listIp banned **********"
 
 				# log event
 				echo -n "$(date +"%Y%m%d %H:%M:%S")  " >> $EVENT_LOG # put timestamp
 				echo "$listIp banned" >> $EVENT_LOG
-			else  
+			else
 				echo "IP already in iptables."
 			fi
 		fi
@@ -81,7 +133,7 @@ function remove_ip () {
 function add_ip () {
 	local ipToBan=$1
 	local epochNow=$(date +"%s")
-	if ! grep -q $ipToBan $LIST_FILE; then
+	if ! grep -q "$ipToBan" "$LIST_FILE"; then
 		echo "$epochNow $ipToBan" >> $LIST_FILE
 		echo "$ipToBan added to ban list."
 
@@ -95,7 +147,7 @@ function add_ip () {
 
 
 # run as root
-if [ $(whoami) != "root" ]; then
+if [ "$(whoami)" != "root" ]; then
 	echo "Please run as root"
 	exit
 fi
@@ -106,14 +158,9 @@ if [ -z "$(which inotifywait)" ] ; then
 	exit 1
 fi
 
-# check if iptables is installed and available
-if [ -z "$IPTABLES_CMD" ]; then
-	echo "iptables command not found! Make sure iptables is installed and available in the PATH."
-fi
-
 # check input parameter
 if [ $# -lt 1 ]; then
-	echo "Need one or more paths to log file."
+	echo "Need one or more paths to log file(s) to monitor."
 	exit 1
 fi
 
@@ -123,6 +170,7 @@ file3="$3"
 file4="$4"
 file5="$5"
 
+
 touch $LIST_FILE  # make sure list file exists
 
 echo -n "$(date +"%Y%m%d %H:%M:%S")  "  # put timestamp
@@ -130,7 +178,7 @@ echo "Starting to monitoring files..."
 
 while true; do  # main loop
 	maxWaitTime=$(get_max_wait_time)
-	inotifywait -t $maxWaitTime -e modify -q "$file1" "$file2" "$file3" "$file4" "$file5" | while read file; do
+	inotifywait -t "$maxWaitTime" -e modify -q "$file1" "$file2" "$file3" "$file4" "$file5" | while read file; do
 		echo "--------------------------------------------------"
 		echo -n "$(date +"%Y%m%d %H:%M:%S")  "  # put timestamp
 		echo "Change in logfile detected. Analyzing log files..."
@@ -142,15 +190,18 @@ while true; do  # main loop
 				continue
 			fi
 
+			# figure out date parsing method
+			noOfDateCols=$(dateparsing "$logfile")
+
 			# Find last IP with failed login.
 			echo "Checking $logfile..."
-			ipToCheck=$(cat $logfile | grep $FAILSTRINGS | grep $ALLOWSTRINGS | grep -wo '[0-9]\+[.][0-9]\+[.][0-9]\+[.][0-9]\+' | tail -n 1)
+			ipToCheck=$(cat "$logfile" | grep $FAILSTRINGS | grep $ALLOWSTRINGS | grep -wo '[0-9]\+[.][0-9]\+[.][0-9]\+[.][0-9]\+' | tail -n 1)
 
 			if [[ -n $ipToCheck ]]; then  # if not empty string
 
 				echo
 				echo -n "Checking if IP: $ipToCheck is banned..."
-				if grep -wq $ipToCheck $LIST_FILE ; then  # do nothing more if IP is already banned
+				if grep -wq "$ipToCheck" "$LIST_FILE"; then  # do nothing more if IP is already banned
 					echo "yes"
 					continue
 				else
@@ -159,11 +210,11 @@ while true; do  # main loop
 
 				echo
 				echo -n "No of failed access attempts: "
-				echo "$(grep -w $ipToCheck $logfile | grep $FAILSTRINGS | grep $ALLOWSTRINGS | wc -l)"  # print no of occurances
+				echo "$(grep -w "$ipToCheck" "$logfile" | grep $FAILSTRINGS | grep $ALLOWSTRINGS | wc -l)"  # print no of occurances
 				echo
-				if [ "$(grep -w $ipToCheck $logfile | grep $FAILSTRINGS | grep $ALLOWSTRINGS | wc -l)" -gt "$MAX_NO_OF_FAILS" ]; then  # check if no of occurances is more than allowed
-					earliestOccurrenceWithinTimespan=$(cat $logfile | grep -we $ipToCheck | grep $FAILSTRINGS | grep $ALLOWSTRINGS | tr -s ' ' | cut -d ' ' -f 1 | tail -n $((MAX_NO_OF_FAILS+1)) | head -n 1)  # get earliest timestamp within timespan
-					lastOccurrenceWithinTimespan=$(cat "$logfile" | grep -we $ipToCheck | grep $FAILSTRINGS | grep $ALLOWSTRINGS | tr -s ' ' | cut -d ' ' -f 1 | tail -n 1)  # get last timestamp
+				if [ "$(grep -w "$ipToCheck" "$logfile" | grep $FAILSTRINGS | grep $ALLOWSTRINGS | wc -l)" -gt "$MAX_NO_OF_FAILS" ]; then  # check if no of occurances is more than allowed
+					earliestOccurrenceWithinTimespan=$(grep -we "$ipToCheck" "$logfile" | grep $FAILSTRINGS | grep $ALLOWSTRINGS | tr -s ' ' | cut -d ' ' -f "$noOfDateCols" | tail -n $((MAX_NO_OF_FAILS+1)) | head -n 1)  # get earliest timestamp within occurrence span
+					lastOccurrenceWithinTimespan=$(grep -we "$ipToCheck" "$logfile" | grep $FAILSTRINGS | grep $ALLOWSTRINGS | tr -s ' ' | cut -d ' ' -f "$noOfDateCols" | tail -n 1)  # get last timestamp
 				else
 					echo "Less than $((MAX_NO_OF_FAILS+1)) occurances. Will not ban."; continue  # break loop iteration
 				fi
@@ -181,7 +232,7 @@ while true; do  # main loop
 			echo
 
 			# Check timespan and ban if less than 5 minutes.
-			if [[ $epochEarliestOccurrenceWithinTimespan > $epochPastLimit ]]; then
+			if [[ $epochEarliestOccurrenceWithinTimespan -gt $epochPastLimit ]]; then
 				echo "Less than $PAST_TIME_LIMIT seconds between the $((MAX_NO_OF_FAILS+1)) latest fail logins. Will ban."
 				echo
 				echo "*** Banning IP: $ipToCheck ***"
@@ -195,4 +246,3 @@ while true; do  # main loop
 	# ban added IPs and unban expired IPs
 	ban_and_unban
 done
-
