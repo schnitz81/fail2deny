@@ -72,7 +72,7 @@ function ban_and_unban () {
 		local expiredBanTime=$((epochNow-BANTIME))
 		local listEpoch=$(echo "$line" | xargs | cut -d ' ' -f 1)
 		local listIp=$(echo "$line" | xargs | cut -d ' ' -f 2)
-		local iptablesIpOccurance=0
+		local fwIpOccurrence=0
 
 		if ! [[ $listIp =~ [0-9] ]]; then  # skip rest if line doesn't contain any digits
 			continue
@@ -92,15 +92,15 @@ function ban_and_unban () {
 			# check if IP is already banned by analyzing fwmgr output
 			if [[ "$FWMGR_CMD" =~ "nft" ]]; then
 				if nft list ruleset | awk '/fail2deny/{flag=1} flag; /}/{exit}' | grep -Fw "$listIp"; then  # check for IP in nftables output
-					iptablesIpOccurance=1  # occurence is true
+					fwIpOccurrence=1  # occurence is true
 				fi
 			else
 				mapfile iptablesOutput < <($FWMGR_CMD -L INPUT -v -n)  # get iptables output
 				if echo "${iptablesOutput[@]}" | grep -Fw "$listIp"; then  # check for IP in iptables output
-					iptablesIpOccurance=1  # occurence is true
+					fwIpOccurrence=1  # occurence is true
 				fi
 			fi
-			if [[ $iptablesIpOccurance -lt 1 ]]; then  # if IP doesn't occur in fwmgr
+			if [[ $fwIpOccurrence -lt 1 ]]; then  # if IP doesn't occur in fwmgr
 				if [[ "$FWMGR_CMD" =~ "nft" ]]; then
 					$FWMGR_CMD add element ip filter fail2deny { $listIp }  # ban ip in nftables
 				else
@@ -199,45 +199,43 @@ while true; do  # main loop
 
 			if [[ -n $ipToCheck ]]; then  # if not empty string
 
-				echo
-				echo -n "Checking if IP: $ipToCheck is banned..."
 				if grep -wq "$ipToCheck" "$LIST_FILE"; then  # do nothing more if IP is already banned
-					echo "yes"
+					echo "$ipToCheck is already banned."; echo
 					continue
-				else
-					echo "no"
 				fi
 
-				echo
 				echo -n "No of failed access attempts: "
-				echo "$(grep -w "$ipToCheck" "$logfile" | grep $FAILSTRINGS | grep $ALLOWSTRINGS | wc -l)"  # print no of occurances
+				echo "$(grep -w "$ipToCheck" "$logfile" | grep $FAILSTRINGS | grep $ALLOWSTRINGS | wc -l)"  # print no of occurrences
 				echo
-				if [ "$(grep -w "$ipToCheck" "$logfile" | grep $FAILSTRINGS | grep $ALLOWSTRINGS | wc -l)" -gt "$MAX_NO_OF_FAILS" ]; then  # check if no of occurances is more than allowed
-					earliestOccurrenceWithinTimespan=$(grep -we "$ipToCheck" "$logfile" | grep $FAILSTRINGS | grep $ALLOWSTRINGS | tr -s ' ' | cut -d ' ' -f "$noOfDateCols" | tail -n $((MAX_NO_OF_FAILS+1)) | head -n 1)  # get earliest timestamp within occurrence span
-					lastOccurrenceWithinTimespan=$(grep -we "$ipToCheck" "$logfile" | grep $FAILSTRINGS | grep $ALLOWSTRINGS | tr -s ' ' | cut -d ' ' -f "$noOfDateCols" | tail -n 1)  # get last timestamp
+				if [ "$(grep -w "$ipToCheck" "$logfile" | grep $FAILSTRINGS | grep $ALLOWSTRINGS | wc -l)" -gt "$MAX_NO_OF_FAILS" ]; then  # check if no of occurrences is more than allowed
+					earliestOccurrenceWithinOccurrenceLimit=$(grep -we "$ipToCheck" "$logfile" | grep $FAILSTRINGS | grep $ALLOWSTRINGS | tr -s ' ' | cut -d ' ' -f "$noOfDateCols" | tail -n $((MAX_NO_OF_FAILS+1)) | head -n 1)  # get earliest timestamp within occurrence span
+					lastOccurrenceWithinOccurrenceLimit=$(grep -we "$ipToCheck" "$logfile" | grep $FAILSTRINGS | grep $ALLOWSTRINGS | tr -s ' ' | cut -d ' ' -f "$noOfDateCols" | tail -n 1)  # get last timestamp
 				else
-					echo "Less than $((MAX_NO_OF_FAILS+1)) occurances. Will not ban."; continue  # break loop iteration
+					echo "Less than $((MAX_NO_OF_FAILS+1)) occurrences. Will not ban."; echo
+					continue  # break loop iteration
 				fi
 			else
 				echo "No IP found to analyze."; continue  # break loop iteration
 			fi
 
-			epochLastOccurrenceWithinTimespan=$(date -d "${lastOccurrenceWithinTimespan}" +"%s")  # convert log timestamp to epoch
-			epochPastLimit=$((epochLastOccurrenceWithinTimespan-PAST_TIME_LIMIT))  # calculate oldest relevant time for log timestamps
-			epochEarliestOccurrenceWithinTimespan=$(date -d "${earliestOccurrenceWithinTimespan}" +"%s")  # convert log timestamp to epoch
+			epochNow=$(date +"%s")
+			epochLastOccurrenceWithinOccurrenceLimit=$(date -d "${lastOccurrenceWithinOccurrenceLimit}" +"%s")  # convert log timestamp to epoch
+			epochPastLimit=$((epochLastOccurrenceWithinOccurrenceLimit-PAST_TIME_LIMIT))  # calculate oldest relevant time for log timestamps
+			epochEarliestOccurrenceWithinOccurrenceLimit=$(date -d "${earliestOccurrenceWithinOccurrenceLimit}" +"%s")  # convert log timestamp to epoch
 
-			echo "          last epoch: $epochLastOccurrenceWithinTimespan ($lastOccurrenceWithinTimespan)"
+			echo "          last epoch: $epochLastOccurrenceWithinOccurrenceLimit ($lastOccurrenceWithinOccurrenceLimit)"
 			echo "oldest allowed epoch: $epochPastLimit ($PAST_TIME_LIMIT seconds diff)"
-			echo " no $((MAX_NO_OF_FAILS+1)) past timestamp: $epochEarliestOccurrenceWithinTimespan ($earliestOccurrenceWithinTimespan)"
-			echo
+			echo " no $((MAX_NO_OF_FAILS+1)) past timestamp: $epochEarliestOccurrenceWithinOccurrenceLimit ($earliestOccurrenceWithinOccurrenceLimit)"; echo
 
-			# Check timespan and ban if less than 5 minutes.
-			if [[ $epochEarliestOccurrenceWithinTimespan -gt $epochPastLimit ]]; then
-				echo "Less than $PAST_TIME_LIMIT seconds between the $((MAX_NO_OF_FAILS+1)) latest fail logins. Will ban."
-				echo
+			# don't ban if last occurrence is before past time limit
+			if [[ $epochLastOccurrenceWithinOccurrenceLimit -lt $((epochNow-PAST_TIME_LIMIT)) ]]; then
+				echo "Last abusive occurrence of $ipToCheck is longer ago than past time limit. Will not ban."; echo
+				continue  # break loop iteration
+			# ban if enough abusive occurrences within time span.
+			elif [[ $epochEarliestOccurrenceWithinOccurrenceLimit -gt $epochPastLimit ]]; then
+				echo "Less than $PAST_TIME_LIMIT seconds between the $((MAX_NO_OF_FAILS+1)) latest fail logins. Will ban."; echo
 				echo "*** Banning IP: $ipToCheck ***"
 				add_ip "$ipToCheck"
-
 			else
 				echo "More than $PAST_TIME_LIMIT seconds between fail logins. Not banning."
 			fi
