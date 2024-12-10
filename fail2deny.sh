@@ -1,7 +1,7 @@
 #!/bin/bash
 set -x
 
-BANTIME=$((60*20))   # seconds long bantime
+BANTIME=$((60*60))   # seconds long bantime
 EVENT_LOG="/var/log/fail2deny.log"
 
 PAST_TIME_LIMIT=$((60*20))  # past time in seconds to disallow failed logins
@@ -9,8 +9,8 @@ MAX_NO_OF_FAILS=11   # more fail occurances than this will result in an IP ban
 LIST_FILE="/etc/fail2deny.list"
 
 
-FAILSTRINGS="-i -e fail -e invalid[[:space:]]user"  # Search words (case insensitive). The strings in log that are considered fail attempts.
-ALLOWSTRINGS="-v -i -e check -e pam_unix -e '127.0.0.1'"  # Exceptions strings that will override the search words.
+FAILSTRINGS="-i -e fail -e invalid[[:space:]]user -e log4shell"  # Search words (case insensitive). The strings in log that are considered fail attempts.
+ALLOWSTRINGS="-v -i -e check -e pam_unix -e 127.0.0.1 -e 192.168.0 -e 192.168.1"  # Exceptions strings that will override the search words.
 
 # get firewall mgr path
 if $(which iptables >/dev/null); then
