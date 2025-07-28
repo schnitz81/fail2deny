@@ -25,6 +25,11 @@ fi
 ############################### FUNCTIONS ##########################################
 
 
+function log () {
+        local logmsg=$1
+        echo "$(date +"%Y%m%d %H:%M:%S") $logmsg" | tee -a $EVENT_LOG
+}
+
 function dateparsing () {
 	# Check what no of cols generates a valid date parsing and return the no. of cols
 	if $(date -d "$(tail -n 1 $1 | tr -s ' ' | awk '{print $1, $2, $3, $4}')" +"%s" 1>/dev/null 2>&1); then
@@ -109,8 +114,7 @@ function ban_and_unban () {
 				echo "********** $listIp banned **********"
 
 				# log event
-				echo -n "$(date +"%Y%m%d %H:%M:%S")  " >> $EVENT_LOG # put timestamp
-				echo "$listIp banned" >> $EVENT_LOG
+				log "$listIp banned"
 			else
 				echo "IP already in iptables."
 			fi
@@ -125,8 +129,7 @@ function remove_ip () {
 	echo "$listIp unbanned."
 
 	# log event
-	echo -n "$(date +"%Y%m%d %H:%M:%S")  " >> $EVENT_LOG # put timestamp
-	echo "$listIp unbanned" >> $EVENT_LOG
+	log "$listIp unbanned"
 }
 
 
@@ -173,8 +176,7 @@ file5="$5"
 
 touch $LIST_FILE  # make sure list file exists
 
-echo -n "$(date +"%Y%m%d %H:%M:%S")  "  # put timestamp
-echo "Starting to monitoring files..."
+log "Starting to monitor files..."
 
 while true; do  # main loop
 	maxWaitTime=$(get_max_wait_time)
