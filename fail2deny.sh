@@ -1,5 +1,5 @@
 #!/bin/bash
-set -x
+#set -x
 
 BANTIME=$((60*60))   # seconds long bantime
 EVENT_LOG="/var/log/fail2deny.log"
@@ -206,10 +206,9 @@ while true; do  # main loop
 					continue
 				fi
 
-				echo -n "No of failed access attempts: "
-				echo "$(grep -w "$ipToCheck" "$logfile" | grep $FAILSTRINGS | grep $ALLOWSTRINGS | wc -l)"  # print no of occurrences
-				echo
-				if [ "$(grep -w "$ipToCheck" "$logfile" | grep $FAILSTRINGS | grep $ALLOWSTRINGS | wc -l)" -gt "$MAX_NO_OF_FAILS" ]; then  # check if no of occurrences is more than allowed
+				noOfFailedAttempts=$(grep -w "$ipToCheck" "$logfile" | grep $FAILSTRINGS | grep $ALLOWSTRINGS | wc -l)
+				echo "$ipToCheck no of failed access attempts: $noOfFailedAttempts"
+				if [ "$noOfFailedAttempts" -gt "$MAX_NO_OF_FAILS" ]; then  # check if no of occurrences is more than allowed
 					earliestOccurrenceWithinOccurrenceLimit=$(grep -we "$ipToCheck" "$logfile" | grep $FAILSTRINGS | grep $ALLOWSTRINGS | tr -s ' ' | cut -d ' ' -f "$noOfDateCols" | tail -n $((MAX_NO_OF_FAILS+1)) | head -n 1)  # get earliest timestamp within occurrence span
 					lastOccurrenceWithinOccurrenceLimit=$(grep -we "$ipToCheck" "$logfile" | grep $FAILSTRINGS | grep $ALLOWSTRINGS | tr -s ' ' | cut -d ' ' -f "$noOfDateCols" | tail -n 1)  # get last timestamp
 				else
